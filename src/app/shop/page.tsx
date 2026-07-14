@@ -9,7 +9,8 @@ const products = [
     slug: "ostobelt",
     name: "OstoBelt Active Support",
     tagline: "Secure. Discreet. Built for life.",
-    price: "₹2,499",
+    price: "₹2,799",
+    originalPrice: "₹3,099",
     badge: "Bestseller",
     img: "/assets/men_s_ileostomy_belt_2_5.png",
     desc: "India's first premium active-support belt for ostomates. Secures your pouch completely under any clothing.",
@@ -78,9 +79,16 @@ export default function Shop() {
                       {product.desc}
                     </p>
                     <div className="flex items-center justify-between">
-                      <span className="font-outfit text-2xl font-bold text-primary">
-                        {product.price}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-outfit text-2xl font-bold text-primary leading-none mb-1">
+                          {product.price}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="font-outfit text-sm font-bold text-text-muted line-through opacity-70 leading-none">
+                            {product.originalPrice}
+                          </span>
+                        )}
+                      </div>
                       <span className="inline-flex items-center gap-1.5 font-outfit font-bold text-sm text-text-main group-hover:text-primary transition-colors">
                         View Product
                         <span className="group-hover:translate-x-1 transition-transform inline-block">→</span>

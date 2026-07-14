@@ -3,6 +3,8 @@ import { Outfit, Public_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -34,9 +36,13 @@ export default function RootLayout({
       className={`${outfit.variable} ${publicSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-text-main">
-        <Navbar />
-        <main className="flex-1 pt-24">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <CartProvider>
+            <Navbar />
+            <main className="flex-1 pt-24">{children}</main>
+            <Footer />
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

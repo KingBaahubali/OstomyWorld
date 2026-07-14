@@ -3,12 +3,14 @@
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { useCart } from "@/context/CartContext";
 
 export default function Shop() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [pincode, setPincode] = useState<string>("");
   const [showToast, setShowToast] = useState(false);
+  const { addToCart } = useCart();
 
   const handleBuyNow = () => {
     if (!selectedSize) {
@@ -16,6 +18,16 @@ export default function Shop() {
       return;
     }
     
+    addToCart({
+      id: `ostobelt-${selectedSize}`,
+      productId: "ostobelt",
+      name: "OstoBelt Active Support",
+      size: selectedSize,
+      price: 2799,
+      quantity,
+      image: "/assets/men_s_ileostomy_belt_2_5.png"
+    });
+
     setShowToast(true);
     setTimeout(() => {
       setShowToast(false);
@@ -129,8 +141,13 @@ export default function Shop() {
                 <h2 className="font-outfit text-3xl md:text-5xl font-bold text-text-main mb-2">
                   OstoBelt Active Support
                 </h2>
-                <div className="font-outfit text-4xl font-bold text-primary mb-6">
-                  ₹2,499
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="font-outfit text-4xl font-bold text-primary">
+                    ₹2,799
+                  </div>
+                  <div className="font-outfit text-2xl font-bold text-text-muted line-through opacity-70">
+                    ₹3,099
+                  </div>
                 </div>
                 
                 <p className="font-public text-text-muted text-lg mb-8 border-b border-text-muted/20 pb-8">
@@ -207,7 +224,7 @@ export default function Shop() {
                   className="bg-primary text-background font-outfit font-bold text-xl py-5 px-8 rounded-xl hover:opacity-95 transition-all w-full shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.98]"
                   style={{ maxWidth: "448px" }}
                 >
-                  {selectedSize ? `Add to Cart — ₹${(2499 * quantity).toLocaleString('en-IN')}` : `Select Size to Buy`}
+                  {selectedSize ? `Add to Cart — ₹${(2799 * quantity).toLocaleString('en-IN')}` : `Select Size to Buy`}
                 </button>
               </motion.div>
             </div>
