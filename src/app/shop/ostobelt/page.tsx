@@ -95,6 +95,7 @@ export default function Shop() {
                  src="/assets/men_s_ileostomy_belt_2_5.png"
                  alt="OstoBelt Front View"
                  fill
+                 sizes="(max-width: 768px) 100vw, 50vw"
                  className="object-contain p-8 sm:p-12 group-hover:scale-105 transition-transform duration-700"
                  priority
                />
@@ -111,6 +112,7 @@ export default function Shop() {
                    src="/assets/men_colostomy_belt_back_1_1.png"
                    alt="OstoBelt Back View"
                    fill
+                   sizes="(max-width: 768px) 50vw, 25vw"
                    className="object-contain p-4 sm:p-8 group-hover:scale-110 transition-transform duration-500"
                  />
                </motion.div>
@@ -124,6 +126,7 @@ export default function Shop() {
                    src="/assets/hom222.png"
                    alt="OstoBelt Detail View"
                    fill
+                   sizes="(max-width: 768px) 50vw, 25vw"
                    className="object-contain p-4 sm:p-8 group-hover:scale-110 transition-transform duration-500"
                  />
                </motion.div>
