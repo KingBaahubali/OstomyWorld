@@ -21,8 +21,37 @@ const publicSans = Public_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ostomy World | Secure, Discreet, and Active Living",
-  description: "Ostomy World provides premium medical appliances like the OstoBelt for secure, discreet, and active living for the ostomate community.",
+  metadataBase: new URL('https://ostomyworld.in'),
+  title: {
+    default: "Ostomy World | Premium Ostomy & Colostomy Support Belts",
+    template: "%s | Ostomy World",
+  },
+  description: "India's first premium medical-grade ostomy support belts. Designed for security, discretion, and an active lifestyle. Free shipping across India.",
+  keywords: ["ostomy belt", "colostomy support belt", "ileostomy belt india", "ostomy pouch cover", "stoma support", "ostomy active wear", "ostomy bag cover"],
+  authors: [{ name: "Ostomy World" }],
+  creator: "Ostomy World",
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: "https://ostomyworld.in",
+    title: "Ostomy World | Premium Ostomy & Colostomy Support Belts",
+    description: "India's first premium medical-grade ostomy support belts. Designed for security, discretion, and an active lifestyle.",
+    siteName: "Ostomy World",
+    images: [
+      {
+        url: "/assets/hero_family_v2.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Ostomy World Family",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ostomy World | Premium Ostomy & Colostomy Support Belts",
+    description: "India's first premium medical-grade ostomy support belts. Designed for security, discretion, and an active lifestyle.",
+    images: ["/assets/hero_family_v2.jpg"],
+  },
 };
 
 export default function RootLayout({
