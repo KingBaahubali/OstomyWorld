@@ -31,11 +31,7 @@ export default function Checkout() {
       alert("Please sign in to continue to checkout.");
       router.push("/login");
     }
-    // If cart is empty, redirect to shop
-    if (items.length === 0) {
-      router.push("/shop");
-    }
-  }, [user, authLoading, items, router]);
+  }, [user, authLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -62,7 +58,28 @@ export default function Checkout() {
 
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      // 2. Clear cart
+      // 2. Push order to Shiprocket automatically
+      try {
+        const shiprocketResponse = await fetch("/api/shiprocket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...orderData,
+            orderId: docRef.id // Important: Pass the generated Firestore ID so Shiprocket can use it as order_id
+          }),
+        });
+        
+        if (!shiprocketResponse.ok) {
+          console.error("Shiprocket integration returned an error:", await shiprocketResponse.text());
+          // Note: We don't block the user's success page if Shiprocket fails, 
+          // because the order is safely captured in Firestore. 
+          // You might want to log this to a slack channel or email admin in production.
+        }
+      } catch (shiprocketError) {
+        console.error("Failed to connect to Shiprocket API:", shiprocketError);
+      }
+      
+      // 3. Clear cart
       clearCart();
       
       // 3. Redirect to success page
@@ -75,8 +92,19 @@ export default function Checkout() {
     }
   };
 
-  if (authLoading || !user || items.length === 0) {
+  if (authLoading || !user) {
     return <div className="min-h-screen bg-background pt-32 text-center">Loading...</div>;
+  }
+
+  if (items.length === 0 && !isSubmitting) {
+    return (
+      <div className="min-h-screen bg-background pt-32 text-center flex flex-col items-center">
+        <h2 className="font-outfit text-2xl font-bold mb-4">Your cart is empty</h2>
+        <Link href="/shop" className="bg-primary text-background px-6 py-3 rounded-lg font-outfit font-bold">
+          Return to Shop
+        </Link>
+      </div>
+    );
   }
 
   return (
