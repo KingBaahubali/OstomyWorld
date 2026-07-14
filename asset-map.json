@@ -1,0 +1,42 @@
+{
+  "logos": {
+    "full_green": "/assets/Full logo green.png",
+    "symbol_green": "/assets/logo symbol green.png",
+    "text_green": "/assets/logo text green.png",
+    "full_white": "/assets/full logo white.png",
+    "symbol_white": "/assets/OstomyWorld White Logo only.png",
+    "text_white": "/assets/OstomyWorld White Text only.png",
+    "ostobelt_green_png": "/assets/OstoBelt green png.png",
+    "ostobelt_logo_green_jpg": "/assets/OstoBelt logo green.jpg",
+    "ostobelt": "/assets/OstoBelt.png",
+    "ostobelt_logo_white_jpg": "/assets/Ostobelt logo white.jpg",
+    "ostobelt_white_png": "/assets/ostobelt white png.png",
+    "ostobelt_white": "/assets/ostobelt white.png",
+    "misc_1": "/assets/LogoMakr-6edmQT.png",
+    "misc_2": "/assets/LogoMakr-9KjfrQ.png"
+  },
+  "product": {
+    "model_back": "/assets/men_colostomy_belt_back_1_1.png",
+    "model_front": "/assets/men_s_ileostomy_belt_2_5.png",
+    "product_detail": "/assets/hom222.png"
+  },
+  "instructions": {
+    "step_1": "/assets/Step 1.png",
+    "step_1_alt": "/assets/Step 1 copy.png",
+    "step_2": "/assets/STEP 2.png",
+    "step_2_alt": "/assets/Step2.png",
+    "step_3": "/assets/Step 3.png",
+    "step_3_alt1": "/assets/STEP 3 copy.png",
+    "step_3_alt2": "/assets/STEP 3 copy (1).png",
+    "step_4": "/assets/step 4.png",
+    "step_4_alt": "/assets/STEP4.png",
+    "step_5": "/assets/step 5.png",
+    "step_5_alt": "/assets/STEP5.png",
+    "how_to_wear": "/assets/HOW TO WEAR.jpg",
+    "how_to_wear_2": "/assets/HOW TO WEAR 2.jpg"
+  },
+  "documents": {
+    "thank_you_card": "/assets/Thank you card.jpg",
+    "brochure_pdf": "/assets/gold and green (1).pdf"
+  }
+}
