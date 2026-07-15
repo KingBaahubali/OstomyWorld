@@ -330,13 +330,13 @@ export default function AdminCRM() {
   const avgOrderValue = orders.length ? Math.round(orders.reduce((s, o) => s + o.totalAmount, 0) / orders.length) : 0;
   const pendingOrders = orders.filter(o => o.status === "processing" || o.status === "confirmed").length;
 
-  if (authLoading || !user) return <div className="min-h-screen bg-[#0f1117] flex items-center justify-center font-outfit text-gray-400">Loading...</div>;
+  if (authLoading || !user) return <div className="min-h-screen w-full bg-[#0f1117] flex items-center justify-center font-outfit text-gray-400">Loading...</div>;
 
   // PIN Gate — shown to any logged-in user who hasn't unlocked yet
   if (!pinUnlocked) {
     return (
-      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center px-6">
-        <div className="bg-[#1a1d27] rounded-2xl p-8 w-full max-w-sm border border-white/10 shadow-2xl">
+      <div className="min-h-screen w-full bg-[#0f1117] flex items-center justify-center px-6">
+        <div className="bg-[#1a1d27] rounded-2xl p-8 w-[400px] max-w-full border border-white/10 shadow-2xl">
           <div className="text-center mb-8">
             <div className="w-12 h-12 rounded-2xl bg-primary mx-auto flex items-center justify-center font-bold text-white text-lg mb-4">OW</div>
             <h1 className="font-outfit font-bold text-white text-2xl">Admin Access</h1>
@@ -386,7 +386,7 @@ export default function AdminCRM() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#f8f9fc] font-outfit">
+    <div className="flex min-h-screen w-full bg-[#f8f9fc] font-outfit">
 
       {/* ── Sidebar ── */}
       <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-[#1a1d27] text-white transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 lg:static w-64 flex-shrink-0`}>
