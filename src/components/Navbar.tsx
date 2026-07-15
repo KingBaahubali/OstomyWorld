@@ -24,8 +24,11 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-surface-card transition-colors duration-300">
       <div className="max-w-7xl mx-auto py-md px-4 sm:px-lg flex items-center justify-between md:justify-between h-[80px]">
-        {/* Logo (Left on Mobile and Desktop) */}
-        <Link href="/" className="flex items-center gap-sm flex-shrink-0">
+        {/* Empty div to balance flex on mobile */}
+        <div className="w-10 md:hidden flex-shrink-0"></div>
+
+        {/* Logo (Centered on mobile, Left on Desktop) */}
+        <Link href="/" className="flex items-center gap-sm absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0">
           <Image
             src="/assets/Full logo green.png"
             alt="Ostomy World Logo"
