@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, Public_Sans } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import SiteShell from "@/components/SiteShell";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 
@@ -67,9 +66,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-text-main">
         <AuthProvider>
           <CartProvider>
-            <Navbar />
-            <main className="flex-1 pt-24">{children}</main>
-            <Footer />
+            <SiteShell>{children}</SiteShell>
           </CartProvider>
         </AuthProvider>
       </body>
