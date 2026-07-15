@@ -1,16 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
-export default function Login() {
+function LoginForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+
+  // Where to go after login — default to account page
+  const redirectTo = searchParams.get("redirect") || "/account";
+
+  // If already logged in, redirect immediately
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(redirectTo);
+    }
+  }, [user, authLoading, router, redirectTo]);
+
+  const handleSuccess = () => {
+    router.replace(redirectTo);
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,10 +45,16 @@ export default function Login() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-      // Redirect or show success (will be handled globally or here)
-      alert(isLogin ? "Successfully logged in!" : "Account created successfully!");
+      handleSuccess();
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      const msg = err.code === "auth/invalid-credential"
+        ? "Incorrect email or password."
+        : err.code === "auth/email-already-in-use"
+        ? "An account with this email already exists."
+        : err.code === "auth/weak-password"
+        ? "Password must be at least 6 characters."
+        : err.message || "An error occurred";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -33,28 +62,44 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setError("");
+    setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      alert("Successfully logged in with Google!");
+      handleSuccess();
     } catch (err: any) {
-      setError(err.message || "An error occurred during Google sign in");
+      if (err.code !== "auth/popup-closed-by-user") {
+        setError(err.message || "An error occurred during Google sign in");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (authLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center font-public text-text-muted">Loading...</div>;
+  }
+
+  // Already logged in — waiting for redirect
+  if (user) {
+    return <div className="min-h-screen bg-background flex items-center justify-center font-public text-text-muted">Redirecting...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center pt-24 px-6 relative">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="bg-surface-card w-full p-8 sm:p-10 rounded-2xl border border-text-muted/10 shadow-xl"
-        style={{ maxWidth: '448px' }}
+        style={{ maxWidth: "448px" }}
       >
         <div className="text-center mb-8">
           <h1 className="font-outfit text-3xl font-bold text-text-main mb-2">
             {isLogin ? "Welcome Back" : "Create an Account"}
           </h1>
           <p className="font-public text-text-muted">
-            {isLogin ? "Sign in to manage your orders." : "Join Ostomy World to get started."}
+            {isLogin
+              ? "Sign in to continue."
+              : "Create an account to complete your order."}
           </p>
         </div>
 
@@ -64,9 +109,10 @@ export default function Login() {
           </div>
         )}
 
-        <button 
+        <button
           onClick={handleGoogleSignIn}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-public font-bold py-3 px-4 rounded-xl hover:bg-gray-50 transition-colors mb-6 shadow-sm"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-public font-bold py-3 px-4 rounded-xl hover:bg-gray-50 transition-colors mb-6 shadow-sm disabled:opacity-60"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -86,8 +132,8 @@ export default function Login() {
         <form onSubmit={handleEmailAuth} className="flex flex-col gap-4">
           <div>
             <label className="block font-outfit font-bold text-text-main mb-2 text-sm">Email Address</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -97,8 +143,8 @@ export default function Login() {
           </div>
           <div>
             <label className="block font-outfit font-bold text-text-main mb-2 text-sm">Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -106,21 +152,20 @@ export default function Login() {
               placeholder="••••••••"
             />
           </div>
-          
-          <button 
+          <button
             type="submit"
             disabled={loading}
-            className="mt-2 w-full bg-primary text-background font-outfit font-bold text-lg py-4 rounded-xl hover:opacity-95 transition-all shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98] disabled:opacity-70"
+            className="mt-2 w-full bg-primary text-background font-outfit font-bold text-lg py-4 rounded-xl hover:opacity-95 transition-all shadow-md shadow-primary/20 active:scale-[0.98] disabled:opacity-70"
           >
-            {loading ? "Please wait..." : (isLogin ? "Sign In" : "Create Account")}
+            {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
           </button>
         </form>
 
         <div className="mt-8 text-center">
           <p className="font-public text-text-muted text-sm">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button 
-              onClick={() => setIsLogin(!isLogin)}
+            <button
+              onClick={() => { setIsLogin(!isLogin); setError(""); }}
               className="font-outfit font-bold text-primary hover:underline"
             >
               {isLogin ? "Sign Up" : "Sign In"}
@@ -129,5 +174,13 @@ export default function Login() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center font-public text-text-muted">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

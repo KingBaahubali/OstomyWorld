@@ -27,10 +27,9 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // If auth is loaded and user is not logged in, redirect to login
     if (!authLoading && !user) {
-      alert("Please sign in to continue to checkout.");
-      router.push("/login");
+      // Silently redirect to login, preserving the destination
+      router.push("/login?redirect=/checkout");
     }
   }, [user, authLoading, router]);
 
@@ -299,7 +298,11 @@ export default function Checkout() {
               disabled={isSubmitting}
               className="w-full text-center bg-primary text-background font-outfit font-bold text-lg py-4 rounded-xl hover:opacity-95 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Processing..." : "Place Order"}
+              {isSubmitting
+                ? "Processing..."
+                : paymentMethod === "online"
+                ? "Pay with Razorpay →"
+                : "Place Order →"}
             </button>
           </div>
         </div>
