@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import Script from "next/script";
 
 export default function Checkout() {
   const { items, totalPrice, clearCart } = useCart();
@@ -37,58 +38,133 @@ export default function Checkout() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    
-    setIsSubmitting(true);
-    
+  const processSuccessfulOrder = async (paymentStatus: string, razorpayPaymentId?: string) => {
     try {
-      // 1. Create order in Firestore
       const orderData = {
-        userId: user.uid,
-        userEmail: user.email,
+        userId: user!.uid,
+        userEmail: user!.email,
         items,
         totalAmount: totalPrice,
         shippingAddress: formData,
         paymentMethod,
-        status: "processing", // pending, processing, shipped, delivered
+        paymentStatus,
+        razorpayPaymentId: razorpayPaymentId || null,
+        status: "processing",
         createdAt: serverTimestamp(),
       };
 
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      // 2. Push order to Shiprocket automatically
       try {
         const shiprocketResponse = await fetch("/api/shiprocket", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...orderData,
-            orderId: docRef.id // Important: Pass the generated Firestore ID so Shiprocket can use it as order_id
+            orderId: docRef.id
           }),
         });
         
         if (!shiprocketResponse.ok) {
           console.error("Shiprocket integration returned an error:", await shiprocketResponse.text());
-          // Note: We don't block the user's success page if Shiprocket fails, 
-          // because the order is safely captured in Firestore. 
-          // You might want to log this to a slack channel or email admin in production.
         }
       } catch (shiprocketError) {
         console.error("Failed to connect to Shiprocket API:", shiprocketError);
       }
       
-      // 3. Clear cart
       clearCart();
-      
-      // 3. Redirect to success page
       router.push(`/order-success/${docRef.id}`);
 
     } catch (error) {
-      console.error("Error placing order:", error);
-      alert("Something went wrong. Please try again.");
+      console.error("Error saving order to database:", error);
+      alert("Payment was successful, but there was an error saving your order. Please contact support.");
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsSubmitting(true);
+    
+    if (paymentMethod === 'cod') {
+      await processSuccessfulOrder("pending");
+      return;
+    }
+
+    if (paymentMethod === 'online') {
+      try {
+        const res = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: Math.round(totalPrice * 100), // in paise
+            receipt: `rcpt_${Date.now()}`
+          })
+        });
+
+        const order = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(order.error || 'Failed to create Razorpay order');
+        }
+
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+          amount: order.amount,
+          currency: order.currency,
+          name: "Ostomy World",
+          description: "Premium Ostomy Belts",
+          order_id: order.order_id,
+          handler: async function (response: any) {
+            try {
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(response)
+              });
+              
+              const verifyData = await verifyRes.json();
+              if (verifyRes.ok && verifyData.success) {
+                await processSuccessfulOrder("paid", response.razorpay_payment_id);
+              } else {
+                alert("Payment signature verification failed. Please contact support.");
+                setIsSubmitting(false);
+              }
+            } catch (err) {
+              console.error("Error during verification", err);
+              alert("Error verifying payment.");
+              setIsSubmitting(false);
+            }
+          },
+          prefill: {
+            name: formData.fullName,
+            email: user.email,
+            contact: formData.phone
+          },
+          theme: {
+            color: "#3a9c3a"
+          },
+          modal: {
+            ondismiss: function() {
+              setIsSubmitting(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+          alert(`Payment failed: ${response.error.description}`);
+          setIsSubmitting(false);
+        });
+        rzp.open();
+
+      } catch (error: any) {
+        console.error("Razorpay error:", error);
+        alert(error.message || "Failed to initialize payment gateway.");
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -109,6 +185,7 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-16 px-6 sm:px-12 lg:px-20">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-12">
         
         {/* Left Column: Shipping & Payment */}
@@ -168,7 +245,6 @@ export default function Checkout() {
                       <div className="font-outfit font-bold text-text-main">Pay Online (Razorpay)</div>
                       <div className="font-public text-sm text-text-muted">UPI, Cards, Netbanking</div>
                     </div>
-                    <div className="text-xs bg-primary/10 text-primary font-bold px-2 py-1 rounded">Coming Soon</div>
                   </div>
                 </label>
               </div>
@@ -220,7 +296,7 @@ export default function Checkout() {
             <button 
               type="submit"
               form="checkout-form"
-              disabled={isSubmitting || paymentMethod === 'online'}
+              disabled={isSubmitting}
               className="w-full text-center bg-primary text-background font-outfit font-bold text-lg py-4 rounded-xl hover:opacity-95 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? "Processing..." : "Place Order"}
