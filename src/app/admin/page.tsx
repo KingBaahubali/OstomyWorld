@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
+// Removed useAuth import as it is no longer needed
 import { db } from "@/lib/firebase";
 import {
   collection, getDocs, doc, updateDoc, orderBy, query,
@@ -35,7 +35,19 @@ type Coupon = {
   discountValue: number; active: boolean; usageCount?: number;
   expiresAt?: string;
 };
-type Screen = "dashboard" | "orders" | "customers" | "analytics" | "marketing" | "inventory" | "settings";
+type Product = {
+  id: string; // corresponds to slug
+  name: string;
+  tagline: string;
+  price: number;
+  originalPrice?: number;
+  badge?: string;
+  img: string;
+  desc: string;
+  sizes: string[];
+  active: boolean;
+};
+type Screen = "dashboard" | "orders" | "products" | "customers" | "analytics" | "marketing" | "inventory" | "settings";
 
 const ORDER_STATUSES = ["processing", "confirmed", "shipped", "delivered", "cancelled"];
 const STATUS_COLORS: Record<string, string> = {
@@ -73,12 +85,12 @@ function exportOrdersToCSV(orders: Order[]) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Admin PIN (set NEXT_PUBLIC_ADMIN_PIN in .env.local) ─────────────────────
-const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || "Krishn@99";
+// ─── Admin Credentials ─────────────────────
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "Krishn@99";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminCRM() {
-  const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -88,8 +100,9 @@ export default function AdminCRM() {
   const [settings, setSettings] = useState({ storeName: "Ostomy World", phone: "", email: "ostomyworld.in@gmail.com", address: "Hyderabad, Telangana" });
   const [loadingData, setLoadingData] = useState(true);
 
-  // PIN gate
+  // Auth gate
   const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [showPin, setShowPin] = useState(false);
@@ -102,12 +115,12 @@ export default function AdminCRM() {
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === ADMIN_PIN) {
+    if (usernameInput === ADMIN_USER && pinInput === ADMIN_PASS) {
       sessionStorage.setItem("admin_unlocked", "true");
       setPinUnlocked(true);
       setPinError("");
     } else {
-      setPinError("Incorrect password. Try again.");
+      setPinError("Incorrect username or password. Try again.");
       setPinInput("");
     }
   };
@@ -137,38 +150,41 @@ export default function AdminCRM() {
   // Settings state
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Products state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [productForm, setProductForm] = useState<Partial<Product>>({});
+  const [savingProduct, setSavingProduct] = useState(false);
+
   // Inventory state
-  const [inventory, setInventory] = useState<{ S: number; M: number; L: number }>({ S: 0, M: 0, L: 0 });
-  const [savingInventory, setSavingInventory] = useState(false);
+  const [inventory, setInventory] = useState<{ [productId: string]: { [size: string]: number } }>({});
+  const [savingInventory, setSavingInventory] = useState<{ [productId: string]: boolean }>({});
 
   useEffect(() => {
-    if (!authLoading && !user) router.push("/login?redirect=/admin");
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!pinUnlocked || !user) return;
+    if (!pinUnlocked) return;
     (async () => {
       setLoadingData(true);
       try {
-        const [ordersSnap, couponsSnap, settingsDoc, inventoryDoc] = await Promise.all([
+        const [ordersSnap, couponsSnap, settingsDoc, productsSnap, inventorySnap] = await Promise.all([
           getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"))),
           getDocs(collection(db, "coupons")),
           getDoc(doc(db, "admin", "settings")),
-          getDoc(doc(db, "inventory", "ostobelt")),
+          getDocs(collection(db, "products")),
+          getDocs(collection(db, "inventory")),
         ]);
 
         const fetchedOrders: Order[] = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
         setOrders(fetchedOrders);
         setCoupons(couponsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Coupon)));
+        setProducts(productsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
         if (settingsDoc.exists()) setSettings(s => ({ ...s, ...settingsDoc.data() }));
-        if (inventoryDoc.exists()) {
-          const invData = inventoryDoc.data();
-          setInventory({
-            S: invData.stock_S ?? 0,
-            M: invData.stock_M ?? 0,
-            L: invData.stock_L ?? 0,
-          });
-        }
+        
+        const newInventory: { [productId: string]: { [size: string]: number } } = {};
+        inventorySnap.docs.forEach(doc => {
+          newInventory[doc.id] = doc.data() as { [size: string]: number };
+        });
+        setInventory(newInventory);
 
         // Build customer profiles
         const map: Record<string, Customer> = {};
@@ -203,7 +219,7 @@ export default function AdminCRM() {
       } catch (e) { console.error(e); }
       finally { setLoadingData(false); }
     })();
-  }, [pinUnlocked, user]);
+  }, [pinUnlocked]);
 
   // ── Revenue Data ─────────────────────────────────────────────────────────
   const revenueByDay = useMemo(() => {
@@ -337,20 +353,63 @@ export default function AdminCRM() {
     catch { alert("Failed to save."); } finally { setSavingSettings(false); }
   };
 
-  const saveInventory = async () => {
-    setSavingInventory(true);
+  const saveInventory = async (productId: string) => {
+    setSavingInventory(prev => ({ ...prev, [productId]: true }));
     try {
-      await setDoc(doc(db, "inventory", "ostobelt"), {
-        stock_S: inventory.S,
-        stock_M: inventory.M,
-        stock_L: inventory.L,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      const invData = inventory[productId] || {};
+      const payload: { [key: string]: any } = { updatedAt: serverTimestamp() };
+      
+      // Store sizes directly as `stock_{size}`
+      Object.entries(invData).forEach(([size, stock]) => {
+        payload[`stock_${size}`] = stock;
+      });
+
+      await setDoc(doc(db, "inventory", productId), payload, { merge: true });
       alert("Inventory saved!");
     } catch {
       alert("Failed to save inventory.");
     } finally {
-      setSavingInventory(false);
+      setSavingInventory(prev => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  const saveProduct = async () => {
+    if (!productForm.id || !productForm.name || !productForm.price) {
+      alert("Please fill in ID (Slug), Name, and Price.");
+      return;
+    }
+    setSavingProduct(true);
+    try {
+      const payload = {
+        ...productForm,
+        sizes: typeof productForm.sizes === 'string' ? (productForm.sizes as string).split(',').map(s => s.trim()).filter(Boolean) : (productForm.sizes || []),
+      };
+      await setDoc(doc(db, "products", productForm.id), payload, { merge: true });
+      
+      // Update local state
+      setProducts(prev => {
+        const exists = prev.find(p => p.id === productForm.id);
+        if (exists) return prev.map(p => p.id === productForm.id ? { ...p, ...payload } as Product : p);
+        return [{ ...payload } as Product, ...prev];
+      });
+      
+      setIsAddingProduct(false);
+      setSelectedProduct(null);
+      setProductForm({});
+    } catch {
+      alert("Failed to save product");
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    try {
+      await deleteDoc(doc(db, "products", id));
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch {
+      alert("Failed to delete product.");
     }
   };
 
@@ -360,9 +419,7 @@ export default function AdminCRM() {
   const avgOrderValue = orders.length ? Math.round(orders.reduce((s, o) => s + o.totalAmount, 0) / orders.length) : 0;
   const pendingOrders = orders.filter(o => o.status === "processing" || o.status === "confirmed").length;
 
-  if (authLoading || !user) return <div className="min-h-screen w-full bg-[#0f1117] flex items-center justify-center font-outfit text-gray-400">Loading...</div>;
-
-  // PIN Gate — shown to any logged-in user who hasn't unlocked yet
+  // PIN Gate — shown to anyone who hasn't unlocked yet
   if (!pinUnlocked) {
     return (
       <div className="min-h-screen w-full bg-[#0f1117] flex items-center justify-center px-6">
@@ -370,19 +427,26 @@ export default function AdminCRM() {
           <div className="text-center mb-8">
             <div className="w-12 h-12 rounded-2xl bg-primary mx-auto flex items-center justify-center font-bold text-white text-lg mb-4">OW</div>
             <h1 className="font-outfit font-bold text-white text-2xl">Admin Access</h1>
-            <p className="text-gray-400 text-sm font-public mt-2">Enter your admin password to continue</p>
+            <p className="text-gray-400 text-sm font-public mt-2">Enter your admin credentials</p>
           </div>
           {pinError && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-public text-center">{pinError}</div>
           )}
           <form onSubmit={handlePinSubmit} className="space-y-4">
+            <input
+              type="text"
+              value={usernameInput}
+              onChange={e => setUsernameInput(e.target.value)}
+              placeholder="Username"
+              autoFocus
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-public text-sm focus:outline-none focus:border-primary placeholder:text-gray-600"
+            />
             <div className="relative">
               <input
                 type={showPin ? "text" : "password"}
                 value={pinInput}
                 onChange={e => setPinInput(e.target.value)}
-                placeholder="Admin password"
-                autoFocus
+                placeholder="Password"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white font-public text-sm focus:outline-none focus:border-primary placeholder:text-gray-600"
               />
               <button type="button" onClick={() => setShowPin(!showPin)}
@@ -391,15 +455,13 @@ export default function AdminCRM() {
               </button>
             </div>
             <button type="submit"
-              className="w-full bg-primary text-white font-outfit font-bold py-3 rounded-xl hover:opacity-90 transition-all">
-              Unlock Dashboard
+              className="w-full bg-primary text-white font-outfit font-bold py-3 rounded-xl hover:opacity-90 transition-all mt-2">
+              Login to Dashboard
             </button>
           </form>
-          <p className="text-center text-xs text-gray-600 font-public mt-6">Signed in as {user.email}</p>
-          <button onClick={() => { logout(); router.push("/login?redirect=/admin"); }}
-            className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-2">
-            Sign in with a different account →
-          </button>
+          <a href="/" className="block text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-6">
+            ← Back to Store
+          </a>
         </div>
       </div>
     );
@@ -409,6 +471,7 @@ export default function AdminCRM() {
   const navItems: { id: Screen; label: string; icon: string; badge?: number }[] = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "orders", label: "Orders", icon: "📦", badge: pendingOrders || undefined },
+    { id: "products", label: "Products", icon: "🛍️" },
     { id: "customers", label: "Customers", icon: "👥", badge: customers.length || undefined },
     { id: "inventory", label: "Inventory", icon: "📦" },
     { id: "analytics", label: "Analytics", icon: "📈" },
@@ -442,9 +505,9 @@ export default function AdminCRM() {
         </nav>
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-4 py-3">
-            <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-primary font-bold text-xs">{user.email?.[0]?.toUpperCase()}</div>
+            <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-primary font-bold text-xs">{ADMIN_USER?.[0]?.toUpperCase()}</div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-white font-bold truncate">{user.email}</div>
+              <div className="text-xs text-white font-bold truncate">{ADMIN_USER}</div>
               <div className="text-xs text-gray-500">Admin</div>
             </div>
           </div>
@@ -550,6 +613,90 @@ export default function AdminCRM() {
                     {customers.length === 0 && <p className="text-gray-400 text-sm font-public text-center py-4">No customers yet.</p>}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════ PRODUCTS ══════════════ */}
+          {screen === "products" && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Products</h2>
+                <button 
+                  onClick={() => { setIsAddingProduct(true); setProductForm({ active: true, sizes: [] }); }}
+                  className="bg-primary text-white font-bold px-5 py-2.5 rounded-xl hover:bg-black transition-all"
+                >
+                  + Add Product
+                </button>
+              </div>
+
+              {isAddingProduct && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                  <h3 className="font-bold text-gray-800 mb-4">{productForm.id ? "Edit Product" : "New Product"}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Product Slug (e.g. ostobelt)" value={productForm.id || ""} onChange={e => setProductForm(p => ({ ...p, id: e.target.value.toLowerCase().replace(/\s+/g, '-') }))} disabled={!!selectedProduct} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="text" placeholder="Product Name" value={productForm.name || ""} onChange={e => setProductForm(p => ({ ...p, name: e.target.value }))} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="text" placeholder="Tagline" value={productForm.tagline || ""} onChange={e => setProductForm(p => ({ ...p, tagline: e.target.value }))} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="text" placeholder="Badge (Optional)" value={productForm.badge || ""} onChange={e => setProductForm(p => ({ ...p, badge: e.target.value }))} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="number" placeholder="Price (₹)" value={productForm.price || ""} onChange={e => setProductForm(p => ({ ...p, price: Number(e.target.value) }))} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="number" placeholder="Original Price (₹) (Optional)" value={productForm.originalPrice || ""} onChange={e => setProductForm(p => ({ ...p, originalPrice: Number(e.target.value) }))} className="bg-gray-50 border rounded-xl px-4 py-3" />
+                    <input type="text" placeholder="Image URL (e.g. /assets/belt.png)" value={productForm.img || ""} onChange={e => setProductForm(p => ({ ...p, img: e.target.value }))} className="bg-gray-50 border rounded-xl px-4 py-3 md:col-span-2" />
+                    <textarea placeholder="Description" value={productForm.desc || ""} onChange={e => setProductForm(p => ({ ...p, desc: e.target.value }))} className="bg-gray-50 border rounded-xl px-4 py-3 md:col-span-2 h-24" />
+                    <input type="text" placeholder="Sizes (Comma separated)" value={typeof productForm.sizes === 'string' ? productForm.sizes : (productForm.sizes?.join(', ') || "")} onChange={e => setProductForm(p => ({ ...p, sizes: e.target.value as any }))} className="bg-gray-50 border rounded-xl px-4 py-3 md:col-span-2" />
+                    
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" id="active" checked={productForm.active ?? true} onChange={e => setProductForm(p => ({ ...p, active: e.target.checked }))} className="w-5 h-5" />
+                      <label htmlFor="active" className="font-bold text-gray-700">Active (Visible on Store)</label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button onClick={() => { setIsAddingProduct(false); setSelectedProduct(null); }} className="px-6 py-2 rounded-xl font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                    <button onClick={saveProduct} disabled={savingProduct} className="px-6 py-2 rounded-xl font-bold bg-primary text-white hover:bg-black disabled:opacity-50">{savingProduct ? "Saving..." : "Save Product"}</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Product</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Price</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {products.map(product => (
+                      <tr key={product.id} className="hover:bg-gray-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
+                              <img src={product.img} alt={product.name} className="w-full h-full object-contain" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800">{product.name}</p>
+                              <p className="text-xs text-gray-500 font-mono">{product.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-gray-700">₹{product.price}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${product.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {product.active ? "Active" : "Draft"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button onClick={() => { setProductForm(product); setSelectedProduct(product); setIsAddingProduct(true); }} className="text-sm font-bold text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => deleteProduct(product.id)} className="text-sm font-bold text-red-500 hover:underline">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -910,64 +1057,97 @@ export default function AdminCRM() {
 
         {/* ── INVENTORY TAB ── */}
         {screen === "inventory" && (
-          <div className="max-w-3xl space-y-6">
+          <div className="max-w-4xl space-y-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventory Management</h2>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-              <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-xl">📦</span> OstoBelt Stock Levels
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Size S (28"-32")</label>
-                  <input 
-                    type="number" min="0" 
-                    value={inventory.S} 
-                    onChange={e => setInventory(p => ({ ...p, S: Number(e.target.value) }))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Size M (33"-37")</label>
-                  <input 
-                    type="number" min="0" 
-                    value={inventory.M} 
-                    onChange={e => setInventory(p => ({ ...p, M: Number(e.target.value) }))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Size L (38"-42")</label>
-                  <input 
-                    type="number" min="0" 
-                    value={inventory.L} 
-                    onChange={e => setInventory(p => ({ ...p, L: Number(e.target.value) }))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button 
-                  onClick={saveInventory}
-                  disabled={savingInventory}
-                  className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
-                >
-                  {savingInventory ? "Saving..." : "Update Stock"}
-                </button>
-              </div>
-            </div>
             
-            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex gap-4">
-              <span className="text-2xl">💡</span>
-              <div>
-                <h4 className="font-bold text-blue-900 mb-1">How Inventory Works</h4>
-                <p className="text-blue-800 text-sm leading-relaxed">
-                  When a customer purchases a belt, the stock will automatically decrement here. 
-                  If a size reaches 0, the button on the storefront will become grayed out and say "Out of Stock", preventing further purchases.
-                </p>
+            {products.map(product => {
+              // Ensure we have an inventory state object for this product
+              const prodInv = inventory[product.id] || {};
+              
+              return (
+                <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mb-6">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center p-2 border border-gray-100">
+                      <img src={product.img} alt={product.name} className="w-full h-full object-contain" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-lg">{product.name}</h3>
+                      <p className="text-xs text-gray-500 font-mono">{product.id}</p>
+                    </div>
+                  </div>
+                  
+                  {product.sizes.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                      {product.sizes.map(sizeStr => {
+                        // Extract just the size key (e.g. "S" from 'S (28"-32")')
+                        // For generic items without prefix, we just use the whole string safely
+                        let sizeKey = sizeStr.charAt(0);
+                        if (!["S", "M", "L", "XL"].includes(sizeKey)) {
+                           sizeKey = sizeStr.replace(/[^a-zA-Z0-9]/g, ''); // alphanumeric key
+                        }
+                        
+                        return (
+                          <div key={sizeStr} className="space-y-2">
+                            <label className="text-sm font-bold text-gray-700">{sizeStr}</label>
+                            <input 
+                              type="number" min="0" 
+                              value={prodInv[sizeKey] || 0} 
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setInventory(prev => ({
+                                  ...prev,
+                                  [product.id]: {
+                                    ...(prev[product.id] || {}),
+                                    [sizeKey]: val
+                                  }
+                                }));
+                              }}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mb-8">
+                      <label className="text-sm font-bold text-gray-700 block mb-2">Total Stock (No Size Variants)</label>
+                      <input 
+                        type="number" min="0" 
+                        value={prodInv['default'] || 0} 
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          setInventory(prev => ({
+                            ...prev,
+                            [product.id]: {
+                              ...(prev[product.id] || {}),
+                              ['default']: val
+                            }
+                          }));
+                        }}
+                        className="w-full max-w-xs bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={() => saveInventory(product.id)}
+                      disabled={savingInventory[product.id]}
+                      className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:bg-black transition-all disabled:opacity-50"
+                    >
+                      {savingInventory[product.id] ? "Saving..." : "Update Stock"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {products.length === 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                <p className="text-gray-500 font-bold mb-4">No products found.</p>
+                <button onClick={() => { setProductForm({ active: true, sizes: [] }); setIsAddingProduct(true); }} className="text-primary font-bold hover:underline">Add a product</button>
               </div>
-            </div>
+            )}
           </div>
         )}
 

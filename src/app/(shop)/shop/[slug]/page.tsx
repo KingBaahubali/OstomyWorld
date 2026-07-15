@@ -6,33 +6,77 @@ import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useParams } from "next/navigation";
+
+type Product = {
+  id: string; // corresponds to slug
+  name: string;
+  tagline: string;
+  price: number;
+  originalPrice?: number;
+  badge?: string;
+  img: string;
+  desc: string;
+  sizes: string[];
+  active: boolean;
+};
 
 export default function Shop() {
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [pincode, setPincode] = useState<string>("");
   const [showToast, setShowToast] = useState(false);
-  const [inventory, setInventory] = useState<{ S: number; M: number; L: number } | null>(null);
+  const [inventory, setInventory] = useState<{ [key: string]: number } | null>(null);
   const { addToCart } = useCart();
 
   useEffect(() => {
     (async () => {
       try {
-        const docSnap = await getDoc(doc(db, "inventory", "ostobelt"));
+        if (!slug) return;
+        
+        // Fetch Product
+        const productSnap = await getDoc(doc(db, "products", slug));
+        if (productSnap.exists()) {
+          setProduct({ id: productSnap.id, ...productSnap.data() } as Product);
+        }
+
+        // Fetch Inventory
+        const docSnap = await getDoc(doc(db, "inventory", slug));
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setInventory({ S: data.stock_S ?? 0, M: data.stock_M ?? 0, L: data.stock_L ?? 0 });
+          const invData: any = {};
+          // Map all stock_ fields
+          Object.keys(data).forEach(k => {
+            if (k.startsWith("stock_")) {
+              invData[k.replace("stock_", "")] = data[k];
+            }
+          });
+          setInventory(invData);
         }
       } catch (err) {
-        console.error("Failed to load inventory:", err);
+        console.error("Failed to load data:", err);
+      } finally {
+        setLoading(false);
       }
     })();
-  }, []);
+  }, [slug]);
 
   const getAvailableStock = (sizeStr: string) => {
     if (!inventory) return null; // loading state
-    const key = sizeStr.charAt(0) as "S" | "M" | "L";
-    return inventory[key] || 0;
+    
+    // Attempt to find alphanumeric key for generic matching
+    let sizeKey = sizeStr.charAt(0);
+    if (!["S", "M", "L", "XL"].includes(sizeKey)) {
+        sizeKey = sizeStr.replace(/[^a-zA-Z0-9]/g, '');
+    }
+    
+    return inventory[sizeKey] || 0;
   };
 
   const handleSizeSelect = (size: string) => {
@@ -44,19 +88,21 @@ export default function Shop() {
   };
 
   const handleBuyNow = () => {
-    if (!selectedSize) {
+    if (!product) return;
+
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
       alert("Please select a size first.");
       return;
     }
-    
+
     addToCart({
-      id: `ostobelt-${selectedSize}`,
-      productId: "ostobelt",
-      name: "OstoBelt Active Support",
-      size: selectedSize,
-      price: 2799,
+      id: `${product.id}-${selectedSize}`,
+      productId: product.id,
+      name: product.name,
+      price: product.price,
       quantity,
-      image: "/assets/men_s_ileostomy_belt_2_5.png"
+      size: selectedSize || "",
+      image: product.img || "/assets/men_s_ileostomy_belt_2_5.png",
     });
 
     setShowToast(true);
@@ -74,6 +120,8 @@ export default function Shop() {
     }
   };
 
+  if (loading || !product) return null;
+
   return (
     <div className="flex flex-col min-h-screen bg-background pt-12 pb-24 px-6 sm:px-12 lg:px-20 relative">
       {/* Premium Cart Toast Notification */}
@@ -90,27 +138,13 @@ export default function Shop() {
              </div>
              <div>
                <h4 className="font-outfit font-bold text-text-main">Added to Cart</h4>
-               <p className="font-public text-sm text-text-muted">OstoBelt Active Support - {selectedSize} (Qty: {quantity})</p>
+               <p className="font-public text-sm text-text-muted">{product.name} - {selectedSize} (Qty: {quantity})</p>
              </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="max-w-7xl mx-auto w-full pt-8 sm:pt-16">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12 sm:mb-20"
-        >
-          <h1 className="font-outfit text-4xl sm:text-5xl md:text-6xl font-bold text-text-main mb-6">
-            The OstoBelt. One Product. Total Freedom.
-          </h1>
-          <p className="font-public text-lg sm:text-xl text-text-muted max-w-3xl mx-auto leading-relaxed">
-            India&apos;s first premium active-support belt for ostomates — designed to secure your appliance discreetly under any clothing, so you never have to think twice.
-          </p>
-        </motion.div>
-
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-16 relative">
           
           {/* Product Image Gallery */}
@@ -119,48 +153,26 @@ export default function Shop() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-surface-card rounded-2xl p-8 sm:p-12 border border-text-muted/10 flex justify-center items-center relative aspect-square shadow-sm overflow-hidden group"
+              className="bg-surface-card rounded-2xl border border-text-muted/10 relative overflow-hidden aspect-square"
             >
-               <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-               <Image
-                 src="/assets/men_s_ileostomy_belt_2_5.png"
-                 alt="OstoBelt Front View"
-                 fill
-                 sizes="(max-width: 768px) 100vw, 50vw"
-                 className="object-contain p-8 sm:p-12 group-hover:scale-105 transition-transform duration-700"
-                 priority
-               />
+              {product.badge && (
+                <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-primary text-background text-sm font-outfit font-bold rounded-full">
+                  {product.badge}
+                </div>
+              )}
+              <Image 
+                src={product.img || "/assets/men_s_ileostomy_belt_2_5.png"} 
+                alt={product.name} 
+                fill 
+                priority
+                className="object-contain p-12 hover:scale-105 transition-transform duration-500 ease-out"
+              />
             </motion.div>
             
-            <div className="grid grid-cols-2 gap-4 sm:gap-8">
-               <motion.div 
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ duration: 0.6, delay: 0.4 }}
-                 className="bg-surface-card rounded-2xl p-4 sm:p-8 border border-text-muted/10 aspect-square relative shadow-sm group overflow-hidden"
-               >
-                 <Image
-                   src="/assets/men_colostomy_belt_back_1_1.png"
-                   alt="OstoBelt Back View"
-                   fill
-                   sizes="(max-width: 768px) 50vw, 25vw"
-                   className="object-contain p-4 sm:p-8 group-hover:scale-110 transition-transform duration-500"
-                 />
-               </motion.div>
-               <motion.div 
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ duration: 0.6, delay: 0.5 }}
-                 className="bg-surface-card rounded-2xl p-4 sm:p-8 border border-text-muted/10 aspect-square relative shadow-sm group overflow-hidden"
-               >
-                 <Image
-                   src="/assets/hom222.png"
-                   alt="OstoBelt Detail View"
-                   fill
-                   sizes="(max-width: 768px) 50vw, 25vw"
-                   className="object-contain p-4 sm:p-8 group-hover:scale-110 transition-transform duration-500"
-                 />
-               </motion.div>
+            <div className="grid grid-cols-4 gap-4">
+              <button className="bg-surface-card rounded-xl border-2 border-primary aspect-square relative overflow-hidden">
+                <Image src={product.img || "/assets/men_s_ileostomy_belt_2_5.png"} alt="Thumbnail" fill className="object-contain p-2" />
+              </button>
             </div>
           </div>
 
@@ -172,21 +184,35 @@ export default function Shop() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <h2 className="font-outfit text-3xl md:text-5xl font-bold text-text-main mb-2">
-                  OstoBelt Active Support
-                </h2>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="font-outfit text-4xl font-bold text-primary">
-                    ₹2,799
+                {/* Title & Price */}
+                <div className="mb-8">
+                  <p className="font-public text-sm text-secondary font-bold mb-2 uppercase tracking-widest">
+                    {product.tagline}
+                  </p>
+                  <h1 className="font-outfit text-4xl sm:text-5xl font-bold text-text-main mb-4">
+                    {product.name}
+                  </h1>
+                  
+                  <div className="flex items-center gap-4 mb-4">
+                    <span className="font-outfit text-3xl font-bold text-primary">₹{product.price}</span>
+                    {product.originalPrice && (
+                      <span className="font-outfit text-lg font-bold text-text-muted line-through opacity-70">
+                        ₹{product.originalPrice}
+                      </span>
+                    )}
+                    {product.originalPrice && (
+                      <span className="bg-red-50 text-red-600 font-bold px-3 py-1 rounded-full text-sm border border-red-100">
+                        Save ₹{product.originalPrice - product.price}
+                      </span>
+                    )}
                   </div>
-                  <div className="font-outfit text-2xl font-bold text-text-muted line-through opacity-70">
-                    ₹3,099
+                  {/* Description */}
+                  <div className="prose prose-lg text-text-muted font-public mb-10">
+                    <p>
+                      {product.desc}
+                    </p>
                   </div>
                 </div>
-                
-                <p className="font-public text-text-muted text-lg mb-8 border-b border-text-muted/20 pb-8">
-                  Premium active-support belt designed to secure your pouch close to the body with a discreet flange-lock system. Free shipping across India.
-                </p>
 
                 {/* Check Pincode */}
                 <div className="mb-8">
@@ -208,36 +234,38 @@ export default function Shop() {
                 </div>
 
                 {/* Select Size */}
-                <div className="flex flex-col gap-3 mb-8">
-                  <div className="flex justify-between items-center" style={{ maxWidth: "448px" }}>
-                    <h3 className="font-outfit text-lg font-bold text-text-main">Select Size (Waist)</h3>
-                    <a href="/contact#faq" className="font-public text-sm text-primary hover:underline">Sizing Guide</a>
+                {product.sizes && product.sizes.length > 0 && (
+                  <div className="flex flex-col gap-3 mb-8">
+                    <div className="flex justify-between items-center" style={{ maxWidth: "448px" }}>
+                      <h3 className="font-outfit text-lg font-bold text-text-main">Select Size</h3>
+                      <a href="/contact#faq" className="font-public text-sm text-primary hover:underline">Sizing Guide</a>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {product.sizes.map(size => {
+                        const stock = getAvailableStock(size);
+                        const isOutOfStock = stock === 0;
+                        return (
+                          <button 
+                            key={size}
+                            disabled={isOutOfStock}
+                            onClick={() => handleSizeSelect(size)}
+                            className={`px-5 py-3 rounded-lg border-2 font-outfit font-bold transition-all relative ${
+                              selectedSize === size 
+                                ? 'border-primary text-primary bg-primary/5 shadow-md scale-105'
+                                : isOutOfStock
+                                  ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
+                                  : 'border-text-muted/20 bg-background text-text-main hover:border-primary/50'
+                            }`}
+                          >
+                            {size}
+                            {isOutOfStock && <span className="block text-xs font-normal text-red-500 mt-1">Out of Stock</span>}
+                            {!isOutOfStock && stock !== null && stock <= 5 && <span className="block text-xs font-normal text-orange-500 mt-1">Only {stock} left!</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {['S (28"-32")', 'M (33"-37")', 'L (38"-42")'].map(size => {
-                      const stock = getAvailableStock(size);
-                      const isOutOfStock = stock === 0;
-                      return (
-                        <button 
-                          key={size}
-                          disabled={isOutOfStock}
-                          onClick={() => handleSizeSelect(size)}
-                          className={`px-5 py-3 rounded-lg border-2 font-outfit font-bold transition-all relative ${
-                            selectedSize === size 
-                              ? 'border-primary text-primary bg-primary/5 shadow-md scale-105'
-                              : isOutOfStock
-                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
-                                : 'border-text-muted/20 bg-background text-text-main hover:border-primary/50'
-                          }`}
-                        >
-                          {size}
-                          {isOutOfStock && <span className="block text-xs font-normal text-red-500 mt-1">Out of Stock</span>}
-                          {!isOutOfStock && stock !== null && stock <= 5 && <span className="block text-xs font-normal text-orange-500 mt-1">Only {stock} left!</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                )}
 
                 {/* Quantity */}
                 <div className="mb-10">
@@ -254,9 +282,15 @@ export default function Shop() {
                     </span>
                     <button 
                       onClick={() => {
-                        const maxQty = selectedSize ? (getAvailableStock(selectedSize) || 1) : 10;
+                        let maxQty = 10;
+                        if (product.sizes && product.sizes.length > 0) {
+                          maxQty = selectedSize ? (getAvailableStock(selectedSize) || 1) : 10;
+                        } else {
+                          maxQty = getAvailableStock("default") || 10;
+                        }
+                        
                         if (quantity < maxQty) setQuantity(quantity + 1);
-                        else if (selectedSize) alert(`Only ${maxQty} available in stock.`);
+                        else if (selectedSize || product.sizes?.length === 0) alert(`Only ${maxQty} available in stock.`);
                       }}
                       className="px-5 py-2 font-bold text-text-main hover:bg-text-muted/10 transition-colors"
                     >

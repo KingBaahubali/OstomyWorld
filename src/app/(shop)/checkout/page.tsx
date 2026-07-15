@@ -73,13 +73,24 @@ export default function Checkout() {
       
       try {
         for (const item of items) {
+          const productId = item.productId;
+          if (!productId) continue;
+
+          let stockField = "stock_default";
           if (item.size) {
-            const sizeKey = item.size.charAt(0); // "S", "M", "L"
-            if (["S", "M", "L"].includes(sizeKey)) {
-              await updateDoc(doc(db, "inventory", "ostobelt"), {
-                [`stock_${sizeKey}`]: increment(-item.quantity)
-              });
+            let sizeKey = item.size.charAt(0);
+            if (!["S", "M", "L", "XL"].includes(sizeKey)) {
+               sizeKey = item.size.replace(/[^a-zA-Z0-9]/g, '');
             }
+            stockField = `stock_${sizeKey}`;
+          }
+
+          try {
+            await updateDoc(doc(db, "inventory", productId), {
+              [stockField]: increment(-item.quantity)
+            });
+          } catch (updateErr) {
+            console.error("Could not update inventory for", productId, stockField);
           }
         }
       } catch (inventoryError) {
