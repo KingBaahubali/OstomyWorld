@@ -73,9 +73,12 @@ function exportOrdersToCSV(orders: Order[]) {
   URL.revokeObjectURL(url);
 }
 
+// ─── Admin PIN (set NEXT_PUBLIC_ADMIN_PIN in .env.local) ─────────────────────
+const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN || "Krishn@99";
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminCRM() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -84,6 +87,30 @@ export default function AdminCRM() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [settings, setSettings] = useState({ storeName: "Ostomy World", phone: "", email: "ostomyworld.in@gmail.com", address: "Hyderabad, Telangana" });
   const [loadingData, setLoadingData] = useState(true);
+
+  // PIN gate
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [showPin, setShowPin] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("admin_unlocked") === "true") {
+      setPinUnlocked(true);
+    }
+  }, []);
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput === ADMIN_PIN) {
+      sessionStorage.setItem("admin_unlocked", "true");
+      setPinUnlocked(true);
+      setPinError("");
+    } else {
+      setPinError("Incorrect password. Try again.");
+      setPinInput("");
+    }
+  };
 
   // Orders state
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
@@ -110,15 +137,12 @@ export default function AdminCRM() {
   // Settings state
   const [savingSettings, setSavingSettings] = useState(false);
 
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  useEffect(() => {
+    if (!authLoading && !user) router.push("/login?redirect=/admin");
+  }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push("/login");
-    if (!authLoading && user && !isAdmin) router.push("/");
-  }, [user, authLoading, isAdmin, router]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
+    if (!pinUnlocked || !user) return;
     (async () => {
       setLoadingData(true);
       try {
@@ -166,7 +190,7 @@ export default function AdminCRM() {
       } catch (e) { console.error(e); }
       finally { setLoadingData(false); }
     })();
-  }, [isAdmin]);
+  }, [pinUnlocked, user]);
 
   // ── Revenue Data ─────────────────────────────────────────────────────────
   const revenueByDay = useMemo(() => {
@@ -307,7 +331,49 @@ export default function AdminCRM() {
   const pendingOrders = orders.filter(o => o.status === "processing" || o.status === "confirmed").length;
 
   if (authLoading || !user) return <div className="min-h-screen bg-[#0f1117] flex items-center justify-center font-outfit text-gray-400">Loading...</div>;
-  if (!isAdmin) return <div className="min-h-screen bg-[#0f1117] flex items-center justify-center font-outfit text-gray-400">Access denied.</div>;
+
+  // PIN Gate — shown to any logged-in user who hasn't unlocked yet
+  if (!pinUnlocked) {
+    return (
+      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center px-6">
+        <div className="bg-[#1a1d27] rounded-2xl p-8 w-full max-w-sm border border-white/10 shadow-2xl">
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 rounded-2xl bg-primary mx-auto flex items-center justify-center font-bold text-white text-lg mb-4">OW</div>
+            <h1 className="font-outfit font-bold text-white text-2xl">Admin Access</h1>
+            <p className="text-gray-400 text-sm font-public mt-2">Enter your admin password to continue</p>
+          </div>
+          {pinError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-public text-center">{pinError}</div>
+          )}
+          <form onSubmit={handlePinSubmit} className="space-y-4">
+            <div className="relative">
+              <input
+                type={showPin ? "text" : "password"}
+                value={pinInput}
+                onChange={e => setPinInput(e.target.value)}
+                placeholder="Admin password"
+                autoFocus
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white font-public text-sm focus:outline-none focus:border-primary placeholder:text-gray-600"
+              />
+              <button type="button" onClick={() => setShowPin(!showPin)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
+                {showPin ? "🙈" : "👁"}
+              </button>
+            </div>
+            <button type="submit"
+              className="w-full bg-primary text-white font-outfit font-bold py-3 rounded-xl hover:opacity-90 transition-all">
+              Unlock Dashboard
+            </button>
+          </form>
+          <p className="text-center text-xs text-gray-600 font-public mt-6">Signed in as {user.email}</p>
+          <button onClick={() => { logout(); router.push("/login?redirect=/admin"); }}
+            className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-2">
+            Sign in with a different account →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── Sidebar items ─────────────────────────────────────────────────────────
   const navItems: { id: Screen; label: string; icon: string; badge?: number }[] = [
