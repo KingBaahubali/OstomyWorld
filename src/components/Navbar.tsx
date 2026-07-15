@@ -22,10 +22,15 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-surface-card transition-colors duration-300">
+    <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-surface-card transition-colors duration-300">
       <div className="max-w-7xl mx-auto py-md px-4 sm:px-lg flex items-center justify-between md:justify-between h-[80px]">
-        {/* Empty div to balance flex on mobile */}
-        <div className="w-10 md:hidden flex-shrink-0"></div>
+        {/* Mobile Hamburger Icon (Left) */}
+        <button 
+          className="md:hidden p-2 -ml-2 text-text-main flex-shrink-0"
+          onClick={() => setIsMobileMenuOpen(true)}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
 
         {/* Logo (Centered on mobile, Left on Desktop) */}
         <Link href="/" className="flex items-center gap-sm absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0">
@@ -34,7 +39,7 @@ export default function Navbar() {
             alt="Ostomy World Logo"
             width={180}
             height={60}
-            className="object-contain w-[140px] md:w-[180px]"
+            className="object-contain"
           />
         </Link>
         
@@ -66,7 +71,7 @@ export default function Navbar() {
                     {user.email?.charAt(0).toUpperCase()}
                   </div>
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-text-muted/20 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all overflow-hidden flex flex-col">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-text-muted/20 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all overflow-hidden flex flex-col">
                   <span className="px-4 py-3 border-b border-text-muted/10 font-outfit font-bold text-sm truncate">
                     {user.email}
                   </span>
@@ -103,13 +108,8 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile Hamburger Icon (Right) */}
-        <button 
-          className="md:hidden p-2 -mr-2 text-text-main flex-shrink-0"
-          onClick={() => setIsMobileMenuOpen(true)}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-        </button>
+        {/* Empty div to balance flex on mobile */}
+        <div className="w-7 md:hidden flex-shrink-0"></div>
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -124,13 +124,13 @@ export default function Navbar() {
               onClick={() => setIsMobileMenuOpen(false)}
             />
             <motion.div 
-              initial={{ x: "100%" }}
+              initial={{ x: "-100%" }}
               animate={{ x: 0 }}
-              exit={{ x: "100%" }}
+              exit={{ x: "-100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="fixed top-0 right-0 h-full w-[80%] max-w-[320px] bg-white z-[100] border-l border-gray-200 shadow-2xl flex flex-col md:hidden"
+              className="fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-background z-50 border-r border-text-muted/10 shadow-2xl flex flex-col md:hidden"
             >
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <div className="p-4 border-b border-text-muted/10 flex justify-between items-center">
                 <Image src="/assets/Full logo green.png" alt="Logo" width={140} height={40} className="object-contain" />
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-text-muted hover:text-text-main">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -150,7 +150,7 @@ export default function Navbar() {
                   <span className="font-outfit font-bold">Your Cart</span>
                   <div className="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                    <span className="bg-primary text-white px-2 py-0.5 rounded-full text-xs font-bold">{totalItems}</span>
+                    <span className="bg-primary text-background px-2 py-0.5 rounded-full text-xs font-bold">{totalItems}</span>
                   </div>
                 </Link>
 
@@ -167,7 +167,7 @@ export default function Navbar() {
                   )
                 )}
 
-                <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block text-center bg-primary text-white py-3 rounded-lg font-outfit font-bold shadow-md">
+                <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block text-center bg-primary text-background py-3 rounded-lg font-outfit font-bold shadow-md">
                   Shop Now
                 </Link>
               </div>
