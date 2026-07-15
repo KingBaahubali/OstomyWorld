@@ -2,15 +2,46 @@
 
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Shop() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [pincode, setPincode] = useState<string>("");
   const [showToast, setShowToast] = useState(false);
+  const [inventory, setInventory] = useState<{ S: number; M: number; L: number } | null>(null);
   const { addToCart } = useCart();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "inventory", "ostobelt"));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setInventory({ S: data.stock_S ?? 0, M: data.stock_M ?? 0, L: data.stock_L ?? 0 });
+        }
+      } catch (err) {
+        console.error("Failed to load inventory:", err);
+      }
+    })();
+  }, []);
+
+  const getAvailableStock = (sizeStr: string) => {
+    if (!inventory) return null; // loading state
+    const key = sizeStr.charAt(0) as "S" | "M" | "L";
+    return inventory[key] || 0;
+  };
+
+  const handleSizeSelect = (size: string) => {
+    setSelectedSize(size);
+    const stock = getAvailableStock(size);
+    if (stock !== null && quantity > stock) {
+      setQuantity(stock > 0 ? stock : 1);
+    }
+  };
 
   const handleBuyNow = () => {
     if (!selectedSize) {
@@ -183,19 +214,28 @@ export default function Shop() {
                     <a href="/contact#faq" className="font-public text-sm text-primary hover:underline">Sizing Guide</a>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {['S (28"-32")', 'M (33"-37")', 'L (38"-42")'].map(size => (
-                      <button 
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-5 py-3 rounded-lg border-2 font-outfit font-bold transition-all ${
-                          selectedSize === size 
-                            ? 'border-primary text-primary bg-primary/5 shadow-md scale-105'
-                            : 'border-text-muted/20 bg-background text-text-main hover:border-primary/50'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {['S (28"-32")', 'M (33"-37")', 'L (38"-42")'].map(size => {
+                      const stock = getAvailableStock(size);
+                      const isOutOfStock = stock === 0;
+                      return (
+                        <button 
+                          key={size}
+                          disabled={isOutOfStock}
+                          onClick={() => handleSizeSelect(size)}
+                          className={`px-5 py-3 rounded-lg border-2 font-outfit font-bold transition-all relative ${
+                            selectedSize === size 
+                              ? 'border-primary text-primary bg-primary/5 shadow-md scale-105'
+                              : isOutOfStock
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
+                                : 'border-text-muted/20 bg-background text-text-main hover:border-primary/50'
+                          }`}
+                        >
+                          {size}
+                          {isOutOfStock && <span className="block text-xs font-normal text-red-500 mt-1">Out of Stock</span>}
+                          {!isOutOfStock && stock !== null && stock <= 5 && <span className="block text-xs font-normal text-orange-500 mt-1">Only {stock} left!</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -213,7 +253,11 @@ export default function Shop() {
                       {quantity}
                     </span>
                     <button 
-                      onClick={() => setQuantity(quantity + 1)}
+                      onClick={() => {
+                        const maxQty = selectedSize ? (getAvailableStock(selectedSize) || 1) : 10;
+                        if (quantity < maxQty) setQuantity(quantity + 1);
+                        else if (selectedSize) alert(`Only ${maxQty} available in stock.`);
+                      }}
                       className="px-5 py-2 font-bold text-text-main hover:bg-text-muted/10 transition-colors"
                     >
                       +

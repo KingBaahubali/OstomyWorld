@@ -5,7 +5,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Script from "next/script";
@@ -71,6 +71,21 @@ export default function Checkout() {
         console.error("Failed to connect to Shiprocket API:", shiprocketError);
       }
       
+      try {
+        for (const item of items) {
+          if (item.size) {
+            const sizeKey = item.size.charAt(0); // "S", "M", "L"
+            if (["S", "M", "L"].includes(sizeKey)) {
+              await updateDoc(doc(db, "inventory", "ostobelt"), {
+                [`stock_${sizeKey}`]: increment(-item.quantity)
+              });
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error("Failed to update inventory:", inventoryError);
+      }
+
       clearCart();
       router.push(`/order-success/${docRef.id}`);
 

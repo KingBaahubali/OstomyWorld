@@ -35,7 +35,7 @@ type Coupon = {
   discountValue: number; active: boolean; usageCount?: number;
   expiresAt?: string;
 };
-type Screen = "dashboard" | "orders" | "customers" | "analytics" | "marketing" | "settings";
+type Screen = "dashboard" | "orders" | "customers" | "analytics" | "marketing" | "inventory" | "settings";
 
 const ORDER_STATUSES = ["processing", "confirmed", "shipped", "delivered", "cancelled"];
 const STATUS_COLORS: Record<string, string> = {
@@ -137,6 +137,10 @@ export default function AdminCRM() {
   // Settings state
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Inventory state
+  const [inventory, setInventory] = useState<{ S: number; M: number; L: number }>({ S: 0, M: 0, L: 0 });
+  const [savingInventory, setSavingInventory] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) router.push("/login?redirect=/admin");
   }, [user, authLoading, router]);
@@ -146,16 +150,25 @@ export default function AdminCRM() {
     (async () => {
       setLoadingData(true);
       try {
-        const [ordersSnap, couponsSnap, settingsDoc] = await Promise.all([
+        const [ordersSnap, couponsSnap, settingsDoc, inventoryDoc] = await Promise.all([
           getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"))),
           getDocs(collection(db, "coupons")),
           getDoc(doc(db, "admin", "settings")),
+          getDoc(doc(db, "inventory", "ostobelt")),
         ]);
 
         const fetchedOrders: Order[] = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
         setOrders(fetchedOrders);
         setCoupons(couponsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Coupon)));
         if (settingsDoc.exists()) setSettings(s => ({ ...s, ...settingsDoc.data() }));
+        if (inventoryDoc.exists()) {
+          const invData = inventoryDoc.data();
+          setInventory({
+            S: invData.stock_S ?? 0,
+            M: invData.stock_M ?? 0,
+            L: invData.stock_L ?? 0,
+          });
+        }
 
         // Build customer profiles
         const map: Record<string, Customer> = {};
@@ -324,6 +337,23 @@ export default function AdminCRM() {
     catch { alert("Failed to save."); } finally { setSavingSettings(false); }
   };
 
+  const saveInventory = async () => {
+    setSavingInventory(true);
+    try {
+      await setDoc(doc(db, "inventory", "ostobelt"), {
+        stock_S: inventory.S,
+        stock_M: inventory.M,
+        stock_L: inventory.L,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      alert("Inventory saved!");
+    } catch {
+      alert("Failed to save inventory.");
+    } finally {
+      setSavingInventory(false);
+    }
+  };
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalRevenue = orders.filter(o => o.paymentStatus === "paid").reduce((s, o) => s + o.totalAmount, 0);
   const todayOrders = orders.filter(o => { if (!o.createdAt?.toDate) return false; const d = o.createdAt.toDate(), t = new Date(); return d.toDateString() === t.toDateString(); }).length;
@@ -380,6 +410,7 @@ export default function AdminCRM() {
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "orders", label: "Orders", icon: "📦", badge: pendingOrders || undefined },
     { id: "customers", label: "Customers", icon: "👥", badge: customers.length || undefined },
+    { id: "inventory", label: "Inventory", icon: "📦" },
     { id: "analytics", label: "Analytics", icon: "📈" },
     { id: "marketing", label: "Marketing", icon: "🏷️" },
     { id: "settings", label: "Settings", icon: "⚙️" },
@@ -876,6 +907,70 @@ export default function AdminCRM() {
               </div>
             </div>
           )}
+
+        {/* ── INVENTORY TAB ── */}
+        {screen === "inventory" && (
+          <div className="max-w-3xl space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventory Management</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+              <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <span className="text-xl">📦</span> OstoBelt Stock Levels
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Size S (28"-32")</label>
+                  <input 
+                    type="number" min="0" 
+                    value={inventory.S} 
+                    onChange={e => setInventory(p => ({ ...p, S: Number(e.target.value) }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Size M (33"-37")</label>
+                  <input 
+                    type="number" min="0" 
+                    value={inventory.M} 
+                    onChange={e => setInventory(p => ({ ...p, M: Number(e.target.value) }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Size L (38"-42")</label>
+                  <input 
+                    type="number" min="0" 
+                    value={inventory.L} 
+                    onChange={e => setInventory(p => ({ ...p, L: Number(e.target.value) }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-public focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button 
+                  onClick={saveInventory}
+                  disabled={savingInventory}
+                  className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+                >
+                  {savingInventory ? "Saving..." : "Update Stock"}
+                </button>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex gap-4">
+              <span className="text-2xl">💡</span>
+              <div>
+                <h4 className="font-bold text-blue-900 mb-1">How Inventory Works</h4>
+                <p className="text-blue-800 text-sm leading-relaxed">
+                  When a customer purchases a belt, the stock will automatically decrement here. 
+                  If a size reaches 0, the button on the storefront will become grayed out and say "Out of Stock", preventing further purchases.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
 
           {/* ══════════════ SETTINGS ══════════════ */}
           {screen === "settings" && (
