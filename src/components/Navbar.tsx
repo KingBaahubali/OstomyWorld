@@ -22,7 +22,8 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-surface-card transition-colors duration-300">
+    <>
+    <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-surface-card transition-colors duration-300">
       <div className="max-w-7xl mx-auto py-md px-4 sm:px-lg flex items-center justify-between md:justify-between h-[80px]">
         {/* Mobile Hamburger Icon (Left) */}
         <button 
@@ -61,8 +62,9 @@ export default function Navbar() {
           ))}
         </div>
         
-        {/* Right side items (Desktop Only) */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* Right side items (Responsive) */}
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="hidden md:flex items-center gap-4">
           {!loading && (
             user ? (
               <div className="relative group">
@@ -71,7 +73,7 @@ export default function Navbar() {
                     {user.email?.charAt(0).toUpperCase()}
                   </div>
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-text-muted/20 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all overflow-hidden flex flex-col">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-text-muted/20 rounded-xl shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all overflow-hidden flex flex-col">
                   <span className="px-4 py-3 border-b border-text-muted/10 font-outfit font-bold text-sm truncate">
                     {user.email}
                   </span>
@@ -89,6 +91,7 @@ export default function Navbar() {
               </Link>
             )
           )}
+          </div>
           
           <Link href="/cart" className="relative p-2 text-text-main hover:text-primary transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -97,20 +100,18 @@ export default function Navbar() {
               <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
             </svg>
             {totalItems > 0 && (
-              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-background bg-red-500 rounded-full">
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-red-500 rounded-full">
                 {totalItems}
               </span>
             )}
           </Link>
 
-          <Link href="/shop" className="bg-primary text-background px-lg py-sm rounded-md font-outfit font-bold hover:scale-[1.02] hover:shadow-md transition-all active:scale-[0.98] ml-2 flex-shrink-0">
+          <Link href="/shop" className="hidden md:flex bg-primary text-white px-lg py-sm rounded-md font-outfit font-bold hover:scale-[1.02] hover:shadow-md transition-all active:scale-[0.98] ml-2 flex-shrink-0 items-center justify-center">
             Shop Now
           </Link>
         </div>
-
-        {/* Empty div to balance flex on mobile */}
-        <div className="w-7 md:hidden flex-shrink-0"></div>
       </div>
+    </nav>
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -127,8 +128,7 @@ export default function Navbar() {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-background z-50 border-r border-text-muted/10 shadow-2xl flex flex-col md:hidden"
+              className="fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-[#FFFFFF] z-50 border-r border-text-muted/10 shadow-2xl flex flex-col md:hidden"
             >
               <div className="p-4 border-b border-text-muted/10 flex justify-between items-center">
                 <Image src="/assets/Full logo green.png" alt="Logo" width={140} height={40} className="object-contain" />
@@ -150,7 +150,7 @@ export default function Navbar() {
                   <span className="font-outfit font-bold">Your Cart</span>
                   <div className="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                    <span className="bg-primary text-background px-2 py-0.5 rounded-full text-xs font-bold">{totalItems}</span>
+                    <span className="bg-primary text-white px-2 py-0.5 rounded-full text-xs font-bold">{totalItems}</span>
                   </div>
                 </Link>
 
@@ -167,7 +167,7 @@ export default function Navbar() {
                   )
                 )}
 
-                <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block text-center bg-primary text-background py-3 rounded-lg font-outfit font-bold shadow-md">
+                <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block text-center bg-primary text-white py-3 rounded-lg font-outfit font-bold shadow-md">
                   Shop Now
                 </Link>
               </div>
@@ -175,6 +175,6 @@ export default function Navbar() {
           </>
         )}
       </AnimatePresence>
-    </nav>
+    </>
   );
 }
