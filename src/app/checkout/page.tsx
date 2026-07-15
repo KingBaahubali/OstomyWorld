@@ -199,27 +199,110 @@ export default function Checkout() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block font-public font-bold text-sm text-text-main mb-1">Full Name</label>
-                  <input required name="fullName" value={formData.fullName} onChange={handleChange} type="text" className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <input
+                    required
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={e => {
+                      // Only letters and spaces
+                      if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+                    }}
+                    type="text"
+                    placeholder="e.g. Rajesh Kumar"
+                    autoComplete="name"
+                    className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary"
+                  />
                 </div>
                 <div>
                   <label className="block font-public font-bold text-sm text-text-main mb-1">Phone Number</label>
-                  <input required name="phone" value={formData.phone} onChange={handleChange} type="tel" className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <div className="flex">
+                    <span className="flex items-center px-3 bg-surface-card border border-r-0 border-text-muted/30 rounded-l-lg font-public text-text-muted text-sm">+91</span>
+                    <input
+                      required
+                      name="phone"
+                      value={formData.phone}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 10) setFormData({ ...formData, phone: val });
+                      }}
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="9876543210"
+                      maxLength={10}
+                      autoComplete="tel"
+                      className={`flex-1 bg-background border border-text-muted/30 rounded-r-lg px-4 py-3 font-public focus:outline-none focus:border-primary ${
+                        formData.phone && formData.phone.length < 10 ? "border-red-400" : ""
+                      }`}
+                    />
+                  </div>
+                  {formData.phone && formData.phone.length < 10 && (
+                    <p className="text-red-500 text-xs mt-1 font-public">Phone number must be 10 digits</p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-public font-bold text-sm text-text-main mb-1">Pincode</label>
-                  <input required name="pincode" value={formData.pincode} onChange={handleChange} type="text" maxLength={6} className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <input
+                    required
+                    name="pincode"
+                    value={formData.pincode}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      if (val.length <= 6) setFormData({ ...formData, pincode: val });
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="500001"
+                    maxLength={6}
+                    className={`w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary ${
+                      formData.pincode && formData.pincode.length < 6 ? "border-red-400" : ""
+                    }`}
+                  />
+                  {formData.pincode && formData.pincode.length < 6 && (
+                    <p className="text-red-500 text-xs mt-1 font-public">Pincode must be 6 digits</p>
+                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block font-public font-bold text-sm text-text-main mb-1">Address (House No, Building, Street)</label>
-                  <input required name="address" value={formData.address} onChange={handleChange} type="text" className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <input
+                    required
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    type="text"
+                    placeholder="e.g. 12B, Green Park Apartments, MG Road"
+                    autoComplete="street-address"
+                    className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary"
+                  />
                 </div>
                 <div>
                   <label className="block font-public font-bold text-sm text-text-main mb-1">City</label>
-                  <input required name="city" value={formData.city} onChange={handleChange} type="text" className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <input
+                    required
+                    name="city"
+                    value={formData.city}
+                    onChange={e => {
+                      if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+                    }}
+                    type="text"
+                    placeholder="e.g. Hyderabad"
+                    autoComplete="address-level2"
+                    className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary"
+                  />
                 </div>
                 <div>
                   <label className="block font-public font-bold text-sm text-text-main mb-1">State</label>
-                  <input required name="state" value={formData.state} onChange={handleChange} type="text" className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary" />
+                  <input
+                    required
+                    name="state"
+                    value={formData.state}
+                    onChange={e => {
+                      if (/^[a-zA-Z\s]*$/.test(e.target.value)) handleChange(e);
+                    }}
+                    type="text"
+                    placeholder="e.g. Telangana"
+                    autoComplete="address-level1"
+                    className="w-full bg-background border border-text-muted/30 rounded-lg px-4 py-3 font-public focus:outline-none focus:border-primary"
+                  />
                 </div>
               </div>
             </div>
